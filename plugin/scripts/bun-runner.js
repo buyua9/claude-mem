@@ -155,15 +155,16 @@ const stdinData = await collectStdin();
 // Note: Don't use shell mode on Windows - it breaks paths with spaces in usernames
 // Use windowsHide to prevent a visible console window from spawning on Windows
 const child = spawn(bunPath, args, {
-  stdio: [stdinData ? 'pipe' : 'ignore', 'inherit', 'inherit'],
+  // Always pipe stdin so hook entrypoints receive a JSON document.
+  stdio: ['pipe', 'inherit', 'inherit'],
   windowsHide: true,
   env: process.env
 });
 
-// Write buffered stdin to child's pipe, then close it so the child sees EOF
-if (stdinData && child.stdin) {
-  child.stdin.write(stdinData);
-  child.stdin.end();
+// Preserve real hook input, but fall back to an empty JSON object when nothing
+// was piped so worker-service.cjs still receives a valid JSON payload.
+if (child.stdin) {
+  child.stdin.end(stdinData ?? '{}');
 }
 
 child.on('error', (err) => {
